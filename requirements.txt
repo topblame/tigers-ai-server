@@ -14,3 +14,5 @@ transformers==4.57.1
 python-multipart==0.0.20
 pypdf2==3.0.1
 redis==7.1.0
+boto3==1.41.4
+python-multipart==0.0.20
