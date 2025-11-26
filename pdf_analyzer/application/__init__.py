@@ -7,7 +7,7 @@ import io
 import re
 from typing import List
 
-pdf_analyzer_router = APIRouter(tags=["pdf-analyzer"])
+pdf_analyzer_router = APIRouter(tags=["pdf_analyzer_router"])
 
 client = OpenAI()
 
@@ -57,9 +57,8 @@ async def summarize_document(chunks: List[str]) -> str:
     partial_summaries = []
 
     for idx, chunk in enumerate(chunks):
-        # 1. 섹션 요약 프롬프트 수정
         prompt = f"""
-다음은 뉴스 기사의 일부 문단이다. 이 문단의 **핵심 사실(육하원칙)**과 **주요 주장**을 간결하게 요약해라.
+다음은 문서의 일부이다. 이 문단을 핵심 내용만 유지하며 간결하게 요약해라.
 
 문단({idx+1}):
 {chunk}
@@ -69,24 +68,23 @@ async def summarize_document(chunks: List[str]) -> str:
 
     merged = "\n".join(partial_summaries)
 
-    # 2. 전체 요약 프롬프트 수정
+    # 전체 요약
     final_prompt = f"""
-다음은 여러 섹션의 요약문을 결합한 것이다. 이 내용을 **뉴스 기사의 형식**에 맞춰 다음 요소를 포함하여 통합 요약해라.
+다음은 여러 요약문을 결합한 것이다. 이 내용을 다시 한 번 전체 핵심만 유지하며 통합 요약해라.
 
 내용:
 {merged}
 
 출력 형식:
-1.  **제목 (Headline):** 뉴스 기사의 핵심을 담은 한 문장 제목.
-2.  **본문 (Summary):** 누가, 언제, 어디서, 무엇을, 왜, 어떻게 했는지(육하원칙)를 포함하는 2~3문단의 통합 요약.
+- 전체 요약 1개 문단
 """
     final_summary = await ask_gpt(final_prompt, max_tokens=500)
     return final_summary.strip()
 
-# QA 에이전트 (프롬프트 규칙 강화)
+# QA 에이전트
 async def qa_on_document(summary: str, question: str) -> str:
     prompt = f"""
-다음은 뉴스 기사의 요약이다. 이 요약 내의 정보만 사용하여 질문에 답해라.
+다음은 문서 요약이다. 이 요약 내의 정보만 사용하여 질문에 답해라.
 
 요약:
 {summary}
@@ -95,41 +93,34 @@ async def qa_on_document(summary: str, question: str) -> str:
 {question}
 
 규칙:
-- **정보 출처 명확화:** 질문에 대한 답을 요약 내에서 찾아라.
-- **추론 금지:** 요약문에 없는 내용은 절대 추론하여 답하지 말 것.
-- **답변 불가 시:** 없으면 "뉴스 요약에 해당 정보가 명시되어 있지 않습니다."라고 답해라.
+- 추론하지 말고 요약 내에서만 답을 찾아라.
+- 없으면 "문서에 해당 정보 없음"이라고 답해라.
 """
     return (await ask_gpt(prompt, max_tokens=300)).strip()
 
-# 감성 분석 + 키포인트 에이전트 (뉴스에 맞게 키포인트 정의 변경)
+# 감성 분석 + 키포인트 에이전트
 async def analyze_opinions(summary: str) -> dict:
     prompt = f"""
-다음은 뉴스 기사 요약이다. 이 요약에 대해 **감성 분석**과 **핵심 인물/기관 및 사안** 추출을 수행해라.
+다음 문서 요약에 대해 감성 분석과 핵심 포인트 추출을 수행해라.
 
 요약:
 {summary}
 
 출력 형식(JSON):
 {{
-    "sentiment": "positive | negative | neutral | mixed",
-    "key_actors": ["주요 인물 또는 기관1", "주요 인물 또는 기관2", ... 최대 3개],
-    "key_issues": ["핵심 사안/쟁점1", "핵심 사안/쟁점2", ... 최대 3개]
+    "sentiment": "positive | negative | neutral",
+    "key_points": ["핵심 문장1", "핵심 문장2", ... 5개]
 }}
 """
     raw = await ask_gpt(prompt, max_tokens=300)
 
     import json
     try:
-        # JSON 파싱 실패를 대비하여 기본값 구조를 변경 (key_points -> key_actors, key_issues)
-        result = json.loads(raw)
-        # 키 이름이 정확히 일치하지 않을 경우를 대비하여 처리 (선택적)
-        if 'key_points' in result:
-             result['key_issues'] = result.pop('key_points')
-        return result
+        return json.loads(raw)
     except:
-        return {"sentiment": "unknown", "key_actors": [], "key_issues": []}
+        return {"sentiment": "unknown", "key_points": []}
 
-@pdf_analyzer_router.post("/analyze")
+@documents_openai_router.post("/analyze")
 async def analyze_document(file: UploadFile, question: str = Form(...)):
     try:
         content = await file.read()

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from documents.adapter.input.web.documents_router import documents_router
 from social_oauth.adapter.input.web.google_oauth2_router import authentication_router
+from pdf_analyzer.adapter.input.web.pdf_analyzer_router import pdf_analyzer_router
 
 
 app = FastAPI()
@@ -28,6 +29,7 @@ app.add_middleware(
 
 app.include_router(authentication_router, prefix="/authentication")
 app.include_router(documents_router, prefix="/documents")
+app.include_router(pdf_analyzer_router, prefix="/pdf-analyzer")
 
 if __name__ == "__main__":
     import uvicorn
