@@ -8,6 +8,9 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from documents.adapter.input.web.documents_router import documents_router
+from social_oauth.adapter.input.web.google_oauth2_router import authentication_router
+
 
 app = FastAPI()
 
@@ -23,6 +26,8 @@ app.add_middleware(
     allow_headers=["*"],         # 모든 헤더 허용
 )
 
+app.include_router(authentication_router, prefix="/authentication")
+app.include_router(documents_router, prefix="/documents")
 
 if __name__ == "__main__":
     import uvicorn
