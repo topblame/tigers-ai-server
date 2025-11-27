@@ -4,7 +4,6 @@ import boto3
 from fastapi import UploadFile, HTTPException
 
 from typing import List
-from pdf_analyzer.domain.pdf_analyzer import PDFAnalyzer
 from pdf_analyzer.infrastucture.repository.pdf_analyzer_repository_impl import PDFAnalyzerRepositoryImpl
 
 
@@ -27,5 +26,3 @@ class PDFAnalyzerUseCase:
         return cls.__instance
 
 
-    def list_pdf_analyzers(self) -> List[PDFAnalyzer]:
-        return self.repository.find_all()

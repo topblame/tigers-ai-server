@@ -25,6 +25,7 @@ async def register_document(
         "file_name": doc.file_name,
         "s3_key": doc.s3_key,
         "uploader_id": doc.uploader_id,
+        "result": doc.result
     }
 
 @documents_router.get("/list")
