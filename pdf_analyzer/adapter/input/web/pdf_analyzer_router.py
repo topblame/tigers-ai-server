@@ -1,4 +1,9 @@
-from fastapi import APIRouter, UploadFile, Form, HTTPException
+from urllib.parse import urlparse
+
+import boto3
+from botocore.exceptions import NoCredentialsError
+from fastapi import APIRouter, Form, HTTPException
+from fastapi.params import Depends
 from fastapi.responses import JSONResponse
 from openai import OpenAI
 from pypdf import PdfReader
@@ -6,6 +11,8 @@ import asyncio
 import io
 import re
 from typing import List
+
+from account.adapter.input.web.session_helper import get_current_user
 
 pdf_analyzer_router = APIRouter(tags=["pdf-analyzer"])
 
@@ -130,9 +137,13 @@ async def analyze_opinions(summary: str) -> dict:
         return {"sentiment": "unknown", "key_actors": [], "key_issues": []}
 
 @pdf_analyzer_router.post("/analyze")
-async def analyze_document(file: UploadFile, question: str = Form(...)):
+async def analyze_document(
+        file_url: str = Form(...),
+        question: str = Form(...),
+        user_id: int = Depends(get_current_user)
+):
     try:
-        content = await file.read()
+        content = download_s3_file(file_url)
         if not content:
             raise HTTPException(400, "Empty file upload")
 
@@ -162,3 +173,18 @@ async def analyze_document(file: UploadFile, question: str = Form(...)):
 
     except Exception as e:
         raise HTTPException(500, f"{type(e).__name__}: {str(e)}")
+
+def download_s3_file(file_url: str) -> bytes:
+    parsed = urlparse(file_url)
+    bucket_name = parsed.netloc.split('.')[0]
+    object_key = parsed.path.lstrip('/')
+
+    s3 = boto3.client('s3')
+    try:
+        response = s3.get_object(Bucket=bucket_name, Key=object_key)
+        content = response['Body'].read()
+        return content
+    except NoCredentialsError:
+        raise HTTPException(500, "AWS credentials not available.")
+    except s3.exceptions.NoSuchKey:
+        raise HTTPException(404, "File not found in S3.")
